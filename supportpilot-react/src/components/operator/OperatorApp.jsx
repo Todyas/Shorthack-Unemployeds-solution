@@ -26,7 +26,7 @@ export default function OperatorApp() {
     <div className="flex min-h-screen">
       <Sidebar section={section} onSelectSection={selectSection} />
       <main className="flex-1 min-w-0">
-        {view === 'detail' && <TicketDetail ticketId={selectedId} onBack={backToList} />}
+        {view === 'detail' && <TicketDetail ticketId={selectedId} onBack={backToList} onOpenTicket={openTicket} />}
         {view === 'list' && section === 'api' && <ApiPanel />}
         {view === 'list' && section !== 'api' && <TicketBoard onOpenTicket={openTicket} />}
       </main>

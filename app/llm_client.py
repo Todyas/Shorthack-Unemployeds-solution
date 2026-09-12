@@ -26,7 +26,8 @@ Return only valid JSON matching this schema:
       "requires_clarification": false,
       "missing_info": [],
       "kb_template_id": "string or null",
-      "draft_reply": "string or null"
+      "draft_reply": "string or null",
+      "reasoning": "1-2 sentences in Russian, for the operator, not the end user"
     }
   ]
 }
@@ -38,8 +39,12 @@ Rules:
 - Use urgent only for physical access, door locks, urgent outage, safety, or immediate blockers.
 - Every ticket goes to a human operator for review before anything is sent to the user — write
   draft_reply as a recommended answer for that operator to check and edit, not as a message you
-  are sending yourself. Always fill draft_reply with a concrete, helpful suggestion; leave it null
-  only for request_clarification, where missing_info should list what to ask instead.
+  are sending yourself. draft_reply must be an actual answer to the problem (instructions, a fix,
+  next steps) — never a restatement or paraphrase of original_fragment. If you don't have a real
+  answer, set draft_reply to null instead of repeating the user's own text back at them.
+- reasoning must explain, for the operator, WHY you picked this category/priority/action_type —
+  e.g. which keyword or fact drove it, or why the topic doesn't clearly fit any known category.
+  Never leave reasoning null.
 - Return valid JSON only, without markdown fences.
 """
 
@@ -112,23 +117,42 @@ def _extract_fragments(raw_text: str) -> list[str]:
     return fragments[:2]
 
 
+def _smart_truncate(text: str, limit: int = 140) -> str:
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0]
+    return (cut or text[:limit]).rstrip(",.;: ") + "…"
+
+
 def _build_fallback_ticket(raw_text: str, fragment: str) -> SubTicket:
     category = _detect_category(fragment)
+    lowered = _lower_text(fragment)
     action_type = ActionType.AUTO_REPLY
-    if "отпуск" in _lower_text(fragment) or "соглас" in _lower_text(fragment):
+    if "отпуск" in lowered or "соглас" in lowered:
         action_type = ActionType.REQUEST_CLARIFICATION
-    if category in {Category.ACCESS_CONTROL, Category.HR} and "срочно" in _lower_text(fragment):
+    if category in {Category.ACCESS_CONTROL, Category.HR} and "срочно" in lowered:
         action_type = ActionType.ESCALATE
     kb_template_id = get_kb_template_for_text(fragment, category) if category != Category.OTHER else None
     draft_reply = None
     if kb_template_id:
-        draft_reply = f"Здравствуйте! По вашему обращению о {category.value} подготовлен шаблон поддержки."
+        draft_reply = _kb_template_body(kb_template_id)
     missing_info: list[str] = []
     if action_type == ActionType.REQUEST_CLARIFICATION:
         missing_info = ["даты отпуска", "ФИО/табельный номер сотрудника"]
+
+    if category == Category.OTHER:
+        reasoning = (
+            "Эвристика по ключевым словам (LLM недоступен) не нашла совпадений ни с одной "
+            "известной категорией — возможно, обращение не относится к ИТ-поддержке."
+        )
+    elif kb_template_id:
+        reasoning = f"Эвристика по ключевым словам определила категорию «{category.value}» и нашла подходящий шаблон в базе знаний."
+    else:
+        reasoning = f"Эвристика по ключевым словам определила категорию «{category.value}», но готового шаблона ответа в базе знаний нет."
+
     return SubTicket(
         original_fragment=fragment,
-        summary=fragment[:120] if len(fragment) > 120 else fragment,
+        summary=_smart_truncate(fragment),
         category=category,
         priority=_detect_priority(fragment),
         action_type=action_type,
@@ -136,6 +160,7 @@ def _build_fallback_ticket(raw_text: str, fragment: str) -> SubTicket:
         missing_info=missing_info,
         kb_template_id=kb_template_id,
         draft_reply=draft_reply,
+        reasoning=reasoning,
     )
 
 
@@ -200,13 +225,34 @@ def _kb_template_body(kb_template_id: str | None) -> str | None:
     return None
 
 
+def _normalize_for_comparison(text: str) -> str:
+    return re.sub(r"[^\w\s]", "", text.lower()).strip()
+
+
+def _looks_like_echo(original_fragment: str, draft_reply: str) -> bool:
+    # Модели послабее иногда "отвечают" пользователю его же жалобой, лишь бы
+    # выполнить требование "всегда заполняй draft_reply". Это не ответ —
+    # ловим и обрабатываем как отсутствие черновика.
+    a = _normalize_for_comparison(original_fragment)
+    b = _normalize_for_comparison(draft_reply)
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+    return len(shorter) > 15 and shorter in longer
+
+
 def _apply_kb_safety_net(result: DecompositionResult) -> DecompositionResult:
-    # LLM иногда помечает тикет как auto_reply, но не даёт текста ответа.
-    # Отвечать нечем — подставляем шаблон KB, если он подходит, иначе понижаем
-    # до обычной заявки оператору вместо "пустого" авто-ответа.
+    # Два случая, когда "ответу" от LLM нельзя доверять: он пустой, или он
+    # просто повторяет обращение пользователя. В обоих случаях подставляем
+    # шаблон KB, если подходит, иначе понижаем auto_reply до обычной заявки
+    # оператору вместо пустого/бессмысленного "авто-ответа".
     for ticket in result.tickets:
-        if ticket.draft_reply:
+        has_real_draft = bool(ticket.draft_reply) and not _looks_like_echo(ticket.original_fragment, ticket.draft_reply)
+        if has_real_draft:
             continue
+        ticket.draft_reply = None
         if not ticket.kb_template_id:
             ticket.kb_template_id = get_kb_template_for_text(ticket.original_fragment, ticket.category)
         template_body = _kb_template_body(ticket.kb_template_id)

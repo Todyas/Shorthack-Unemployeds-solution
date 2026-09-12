@@ -18,10 +18,23 @@ def reset_engine(database_url: str | None = None) -> None:
     engine = create_engine(resolved_url, connect_args={"check_same_thread": False})
 
 
+def _ensure_ticket_columns() -> None:
+    # create_all() only creates missing tables, it never alters an existing
+    # one — a demo.db committed before a new column was added would otherwise
+    # break every insert with "no such column". Cheap manual migration since
+    # this project intentionally has no Alembic (see plan.md).
+    with engine.connect() as conn:
+        existing = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(ticket)").fetchall()}
+        if existing and "reasoning" not in existing:
+            conn.exec_driver_sql("ALTER TABLE ticket ADD COLUMN reasoning TEXT")
+            conn.commit()
+
+
 def init_db(database_url: str | None = None) -> None:
     if database_url:
         reset_engine(database_url)
     SQLModel.metadata.create_all(engine)
+    _ensure_ticket_columns()
 
 
 def get_session() -> Iterator[Session]:
@@ -103,6 +116,7 @@ def apply_reanalysis(ticket_id: int, sub: SubTicket) -> Ticket | None:
         ticket.missing_info = list(sub.missing_info or [])
         ticket.kb_template_id = sub.kb_template_id
         ticket.draft_reply = sub.draft_reply
+        ticket.reasoning = sub.reasoning
         ticket.updated_at = datetime.utcnow()
         session.add(ticket)
         session.commit()

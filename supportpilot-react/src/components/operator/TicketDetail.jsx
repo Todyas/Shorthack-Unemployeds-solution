@@ -12,7 +12,7 @@ const tabs = [
   { key: 'history', label: 'История' },
 ]
 
-export default function TicketDetail({ ticketId, onBack }) {
+export default function TicketDetail({ ticketId, onBack, onOpenTicket }) {
   const { tickets } = useTickets()
   const [activeTab, setActiveTab] = useState('ai')
   const ticket = tickets.find((t) => t.id === ticketId)
@@ -58,10 +58,10 @@ export default function TicketDetail({ ticketId, onBack }) {
       </div>
 
       <div className="p-6 space-y-5">
-        {activeTab === 'ai' && <AiAnalysisTab ticket={ticket} />}
+        {activeTab === 'ai' && <AiAnalysisTab ticket={ticket} onOpenTicket={onOpenTicket} />}
         {activeTab === 'raw' && <RawTextTab ticket={ticket} />}
         {activeTab === 'history' && <HistoryTab ticket={ticket} />}
-        <ReplyComposer ticket={ticket} />
+        <ReplyComposer ticket={ticket} onDone={onBack} />
       </div>
     </section>
   )

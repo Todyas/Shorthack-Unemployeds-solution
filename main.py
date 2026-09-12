@@ -85,6 +85,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
                 "missing_info": list(sub.missing_info or []),
                 "kb_template_id": sub.kb_template_id,
                 "draft_reply": sub.draft_reply,
+                "reasoning": sub.reasoning,
                 "status": status_value,
             }
             records.append(record)

@@ -1,4 +1,4 @@
-from app.llm_client import _apply_kb_safety_net, _build_system_prompt, _fallback_decompose
+from app.llm_client import _apply_kb_safety_net, _build_system_prompt, _fallback_decompose, _smart_truncate
 from app.models import ActionType, Category, DecompositionResult, Priority, SubTicket
 
 
@@ -62,3 +62,36 @@ def test_system_prompt_includes_kb_context():
     prompt = _build_system_prompt()
     assert "kb_wifi_auth_error" in prompt
     assert "Здравствуйте! Ошибка авторизации" in prompt
+
+
+def test_kb_safety_net_discards_echoed_reply():
+    # Регрессия: модель иногда "отвечает" пользователю его же текстом жалобы,
+    # лишь бы формально заполнить draft_reply. Это не ответ и не должно
+    # попадать к оператору как рекомендация.
+    fragment = "Я уже несколько лет учусь в вузе, и у меня в автомате не выдалась шоколадка."
+    sub = SubTicket(
+        original_fragment=fragment,
+        summary=fragment,
+        category=Category.OTHER,
+        priority=Priority.MEDIUM,
+        action_type=ActionType.AUTO_REPLY,
+        requires_clarification=False,
+        kb_template_id=None,
+        draft_reply=fragment,
+    )
+    result = _apply_kb_safety_net(DecompositionResult(source_text=fragment, tickets=[sub]))
+
+    ticket = result.tickets[0]
+    assert ticket.draft_reply is None
+    assert ticket.action_type == ActionType.CREATE_TICKET
+
+
+def test_smart_truncate_cuts_on_word_boundary():
+    text = "слово " * 30
+    truncated = _smart_truncate(text, limit=20)
+    assert len(truncated) <= 22
+    assert not truncated.rstrip("…").endswith("слов")
+
+
+def test_smart_truncate_leaves_short_text_untouched():
+    assert _smart_truncate("короткий текст", limit=100) == "короткий текст"

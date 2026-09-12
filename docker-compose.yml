@@ -10,6 +10,12 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
       - backend_data:/data
+    ports:
+      # Не обязателен для http://localhost (nginx уже проксирует /api) — открыт
+      # для удобства: прямой доступ к /docs и для фронтенда, запущенного через
+      # `npm run dev` отдельно от docker compose (VITE_API_BASE_URL по
+      # умолчанию смотрит на localhost:8000).
+      - "8000:8000"
     restart: unless-stopped
 
   frontend:

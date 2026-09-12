@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useTickets } from '../../../context/TicketsContext.jsx'
 import { priorityStyle, priorityLabel } from '../../../data/constants.js'
 
-export default function AiAnalysisTab({ ticket }) {
-  const { reanalyzeTicket } = useTickets()
+export default function AiAnalysisTab({ ticket, onOpenTicket }) {
+  const { tickets, reanalyzeTicket } = useTickets()
   const [reanalyzing, setReanalyzing] = useState(false)
   const [error, setError] = useState(null)
+
+  const siblings = tickets.filter((t) => t.id !== ticket.id && t.parentMessageId && t.parentMessageId === ticket.parentMessageId)
 
   async function handleReanalyze() {
     setReanalyzing(true)
@@ -27,6 +29,26 @@ export default function AiAnalysisTab({ ticket }) {
         <div className="mt-4 pt-4 border-t border-ink-100 text-xs text-ink-500">
           {ticket.userName} · {ticket.userDept}
         </div>
+
+        {siblings.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-ink-100">
+            <p className="text-xs text-ink-500 mb-2">
+              Из этого же обращения создано ещё {siblings.length} {siblings.length === 1 ? 'заявка' : 'заявки'}:
+            </p>
+            <div className="space-y-1.5">
+              {siblings.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => onOpenTicket && onOpenTicket(s.id)}
+                  disabled={!onOpenTicket}
+                  className="w-full text-left text-xs px-2.5 py-1.5 rounded-lg bg-ink-50 hover:bg-ink-100 disabled:cursor-default disabled:hover:bg-ink-50"
+                >
+                  <span className="text-ink-500">#{s.id}</span> {s.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white border border-ink-200 rounded-2xl p-5">
@@ -64,39 +86,24 @@ export default function AiAnalysisTab({ ticket }) {
               <p className="font-medium">{ticket.category}</p>
             </div>
             <div>
-              <p className="text-ink-500 text-xs mb-1">Уверенность</p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-sber-500 rounded-full" style={{ width: `${ticket.confidence}%` }} />
-                </div>
-                <span className="text-xs font-medium">{ticket.confidence}%</span>
-              </div>
-            </div>
-            <div>
               <p className="text-ink-500 text-xs mb-1">Приоритет</p>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${priorityStyle[ticket.priority]}`}>
                 {priorityLabel[ticket.priority]}
               </span>
             </div>
             <div>
-              <p className="text-ink-500 text-xs mb-1">Затронутая система</p>
-              <p className="font-medium">{ticket.system}</p>
+              <p className="text-ink-500 text-xs mb-1">Решение ИИ</p>
+              <p className="font-medium">{ticket.actionTypeLabel}</p>
+            </div>
+            <div>
+              <p className="text-ink-500 text-xs mb-1">Шаблон базы знаний</p>
+              <p className="font-medium">{ticket.kbTemplateId || 'не найден'}</p>
             </div>
           </div>
 
           <div>
-            <p className="text-ink-500 text-xs mb-1">Возможная причина</p>
-            <p>{ticket.cause || '—'}</p>
-          </div>
-
-          <div>
-            <p className="text-ink-500 text-xs mb-1">Обнаружено проблем</p>
-            <div className="flex flex-wrap gap-1.5">
-              {ticket.problems.length === 0 && <span className="text-xs text-ink-500">Не обнаружено</span>}
-              {ticket.problems.map((p, i) => (
-                <span key={i} className="text-xs px-2 py-1 rounded-full bg-ink-100 text-ink-700">{i + 1}. {p}</span>
-              ))}
-            </div>
+            <p className="text-ink-500 text-xs mb-1">Обоснование ИИ</p>
+            <p>{ticket.reasoning || 'ИИ не указал обоснование для этой заявки.'}</p>
           </div>
 
           <div>

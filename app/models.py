@@ -48,6 +48,7 @@ class SubTicket(SQLModel):
     missing_info: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     kb_template_id: Optional[str] = None
     draft_reply: Optional[str] = None
+    reasoning: Optional[str] = None
 
 
 class DecompositionResult(SQLModel):
@@ -67,6 +68,7 @@ class Ticket(SQLModel, table=True):
     missing_info: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     kb_template_id: Optional[str] = None
     draft_reply: Optional[str] = None
+    reasoning: Optional[str] = None
     status: str = Field(default=TicketStatus.NEW.value, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -99,6 +101,7 @@ class TicketRead(SQLModel):
     missing_info: list[str]
     kb_template_id: Optional[str] = None
     draft_reply: Optional[str] = None
+    reasoning: Optional[str] = None
     status: str
     created_at: datetime
     updated_at: datetime

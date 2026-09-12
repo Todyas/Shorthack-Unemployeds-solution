@@ -10,6 +10,13 @@ const CATEGORY_LABELS = {
   other: 'Другое',
 }
 
+export const ACTION_TYPE_LABELS = {
+  auto_reply: 'Авто-ответ по шаблону KB',
+  create_ticket: 'Обычная заявка оператору',
+  request_clarification: 'Нужны уточнения у пользователя',
+  escalate: 'Эскалация — приоритетная заявка',
+}
+
 function formatDateTime(iso) {
   if (!iso) return ''
   const date = new Date(iso)
@@ -46,12 +53,12 @@ export function normalizeTicket(raw) {
     userDept: '—',
     category: categoryLabel,
     priority: raw.priority,
-    confidence: raw.kb_template_id ? 92 : 78,
     system: categoryLabel.split(' → ')[1] || categoryLabel,
-    cause: raw.requires_clarification
-      ? 'Недостаточно данных, требуется уточнение у пользователя'
-      : 'Определено автоматически на основе текста обращения',
-    problems: [raw.summary],
+    // Реальное обоснование от ИИ (или от эвристики-заглушки), а не выдуманный
+    // текст: раньше здесь была всегда одна и та же строка независимо от заявки.
+    reasoning: raw.reasoning,
+    actionType: raw.action_type,
+    actionTypeLabel: ACTION_TYPE_LABELS[raw.action_type] || raw.action_type,
     missing,
     summary: raw.summary,
     original: raw.original_fragment,
