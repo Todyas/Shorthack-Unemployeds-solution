@@ -1,4 +1,4 @@
-# Smart Support Gateway — Архитектурная спецификация MVP
+# TicketHelp — Архитектурная спецификация MVP
 ### Хакатон МИСИС × СберТех | Дедлайн: 6 часов | Реализация через Roo Code
 
 ---
@@ -21,7 +21,7 @@
 | Валидация/схемы | **Pydantic v2** | Тот же класс используется и как контракт для LLM, и как модель API-ответа |
 | БД | **SQLite** через **SQLModel** | SQLModel = Pydantic + SQLAlchemy в одном классе, минимум boilerplate |
 | LLM-вызов | **Anthropic Claude API** (`claude-sonnet-4-6`) через structured output / tool-use, с абстракцией-клиентом | Если на хакатоне есть доступ к GigaChat API (свой продукт СберТеха) — это может дать бонус у жюри; закладываем `llm_client.py` с одной функцией `decompose(text) -> DecompositionResult`, чтобы провайдера можно было заменить за 10 минут без изменения остального кода |
-| Фронтенд | Лежит в supportpilot-react | Дополни его | 
+| Фронтенд | Лежит в frontend | Дополни его | 
 | Drag & Drop | **@dnd-kit/core** | Канбан с перетаскиванием карточек между колонками за 1 компонент |
 | Иконки | **lucide-react** | Уже есть в экосистеме shadcn, значок ⚠️ — просто `<AlertTriangle />` |
 

@@ -12,8 +12,12 @@ wheels/
 dist
 .DS_Store
 
+# Local SQLite database
+*.db
+*.db-journal
+
 # Secrets — never commit real API keys
 .env
 .env.*
 !.env.example
-!supportpilot-react/.env.example
+!frontend/.env.example

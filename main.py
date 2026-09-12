@@ -20,6 +20,7 @@ from app.database import (
     reset_engine,
     send_ticket,
 )
+from app.kb import load_kb
 from app.llm_client import check_llm_status, decompose
 from app.models import ActionType, IngestRequest, TicketPatch, TicketStatus
 
@@ -44,7 +45,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     if database_url:
         reset_engine(database_url)
     init_db(database_url)
-    app = FastAPI(title="Smart Support Gateway", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="TicketHelp API", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -56,6 +57,12 @@ def create_app(database_url: str | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/kb")
+    def list_kb_articles():
+        # Отдаём базу знаний как есть — фронтенд показывает её оператору
+        # в разделе "База знаний" и там же, откуда draft_reply берёт шаблоны.
+        return load_kb()
 
     @app.get("/api/llm/status")
     def llm_status():

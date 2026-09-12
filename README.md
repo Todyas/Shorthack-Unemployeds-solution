@@ -1,68 +1,116 @@
-# Smart Support Gateway
+# TicketHelp
 
-Backend + React frontend for the hackathon support dashboard. The frontend (`supportpilot-react/`) talks to this FastAPI backend over `/api/tickets/*` — no mock data.
+ИИ-помощник технической поддержки: бэкенд на FastAPI + фронтенд на React.
+Пользователь описывает проблему в чате — ИИ разбирает обращение на заявки,
+определяет категорию, приоритет и рекомендованный ответ. Оператор проверяет
+и отправляет ответ сам: ИИ никогда не отвечает пользователю от своего имени.
 
-## Setup
+- `app/`, `main.py` — бэкенд (FastAPI, SQLite через SQLModel)
+- `frontend/` — фронтенд (React + Vite + Tailwind)
+- `kb.json` — база знаний, к которой обращается ИИ и которую видит оператор
+- `tests/` — тесты бэкенда (pytest)
+
+---
+
+## Вариант 1. Запуск без Docker
+
+Нужен Python 3.12+ и Node.js 20+.
+
+**Терминал 1 — бэкенд:**
 
 ```bash
-cd Backend
-export LD_LIBRARY_PATH=/run/host/root/usr/lib64:${LD_LIBRARY_PATH:-}
-/run/host/root/usr/bin/uv sync --extra dev
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## Run
-
-Two terminals, backend first:
+**Терминал 2 — фронтенд:**
 
 ```bash
-# Terminal 1 — backend
-cd Backend
-export LD_LIBRARY_PATH=/run/host/root/usr/lib64:${LD_LIBRARY_PATH:-}
-.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-```bash
-# Terminal 2 — frontend
-cd supportpilot-react
+cd frontend
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173. CORS on the backend is open (`allow_origins=["*"]`), so the frontend can call `http://localhost:8000` directly — override this with `VITE_API_BASE_URL` (see `supportpilot-react/.env.example`) if the backend runs elsewhere.
+Откройте **http://localhost:5173**.
 
-## API
+По умолчанию фронтенд обращается к бэкенду на `http://localhost:8000` (CORS
+на бэкенде открыт, `allow_origins=["*"]`). Если бэкенд слушает другой адрес —
+скопируйте `frontend/.env.example` в `frontend/.env` и поменяйте
+`VITE_API_BASE_URL`.
 
-- GET /health
-- POST /api/tickets/ingest
-- GET /api/tickets
-- GET /api/tickets/{id}
-- PATCH /api/tickets/{id}
-- POST /api/tickets/{id}/reanalyze — re-run AI analysis in place, without moving the ticket's status
-- POST /api/tickets/{id}/send
+Без переменных `YANDEX_API_KEY` / `ANTHROPIC_API_KEY` бэкенд работает на
+детерминированной эвристике по ключевым словам — приложение полностью
+рабочее и без ключа, просто ИИ-часть менее умная, чем с реальной LLM.
 
-Swagger is available at http://localhost:8000/docs. The operator UI also has an "API / Бэкенд" section in the sidebar with a live health check and links to Swagger/ReDoc.
+## Вариант 2. Запуск через Docker
 
-## Run with Docker
-
-One command, single origin — no `:8000`/`:5173` ports to remember:
+Нужен Docker + Docker Compose. Один порт, никаких `:8000` / `:5173` держать в голове не нужно.
 
 ```bash
-cp .env.example .env   # fill in YANDEX_API_KEY / ANTHROPIC_API_KEY if you have one
+cp .env.example .env   # при желании впишите YANDEX_API_KEY / ANTHROPIC_API_KEY
 docker compose up --build
 ```
 
-Open **http://localhost**. The frontend container (nginx) serves the built React app and reverse-proxies `/api/*`, `/health`, `/docs`, `/redoc`, `/openapi.json` to the backend container over the internal compose network — the backend itself isn't published to the host, so there is exactly one address to open. Ticket data persists in a named volume (`backend_data`) across rebuilds.
+Откройте **http://localhost**. Контейнер фронтенда (nginx) отдаёт собранный
+React и проксирует `/api/*`, `/health`, `/docs`, `/redoc`, `/openapi.json` на
+бэкенд внутри compose-сети — наружу открыт только один адрес. Данные заявок
+сохраняются в именованном томе (`backend_data`) между пересборками.
 
-## LLM provider
+Остановить: `docker compose down` (данные останутся в томе; чтобы стереть и
+их — `docker compose down -v`).
 
-`app/llm_client.py` picks a provider by whichever key is set, in order, and always has a deterministic fallback so a demo never breaks:
+---
 
-1. **Yandex Cloud** (OpenAI-compatible Foundation Models API) if `YANDEX_API_KEY` is set — see `API_example.py` for the raw call shape this mirrors.
-2. **Anthropic Claude** if `ANTHROPIC_API_KEY` is set instead.
-3. A keyword-based heuristic (`_fallback_decompose`) if neither key is set, or if the API call fails for any reason (network, quota, invalid JSON).
+## API
 
-The system prompt sent to either LLM includes the actual `kb.json` contents (ids, keywords, template text) as searchable context, with an explicit instruction not to guess at terms/systems that aren't covered by it — so an unfamiliar acronym or internal system name gets routed to a human operator (`category=other`, `create_ticket`/`request_clarification`) instead of a hallucinated answer. A second safety net (`_apply_kb_safety_net`) then checks every ticket regardless of provider: if a ticket is marked `auto_reply` but has no actual reply text, it's downgraded to a normal operator-reviewed ticket rather than "auto-replying" with nothing.
+- `GET /health` — проверка живости бэкенда
+- `GET /api/llm/status` — реальная проверка ключа ИИ-провайдера
+- `GET /api/kb` — база знаний (статьи, по которым ИИ ищет готовые ответы)
+- `POST /api/tickets/ingest` — разбор обращения на заявки (вызывает ИИ)
+- `GET /api/tickets` — список заявок (фильтры: `status`, `priority`, `category`)
+- `GET /api/tickets/{id}` — одна заявка
+- `PATCH /api/tickets/{id}` — изменение статуса / текста ответа оператором
+- `POST /api/tickets/{id}/reanalyze` — повторный анализ ИИ без смены статуса
+- `POST /api/tickets/{id}/send` — отметить заявку отправленной/решённой
 
-## Product note
+Swagger — **http://localhost:8000/docs** (или `http://localhost/docs` в Docker).
+В интерфейсе оператора есть раздел «API / Бэкенд» с живой проверкой связи и
+ссылками на Swagger/ReDoc.
 
-This is a second-line support tool: the AI never replies to the end user automatically. `POST /api/tickets/ingest` is always called with `allow_ai_reply: false` from the chat UI, so tickets always land with an operator for review — the AI's `draft_reply` is only ever shown to the operator as a "recommended answer" to insert, edit, and send manually.
+## Тесты
+
+```bash
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest -q
+```
+
+## ИИ-провайдер
+
+`app/llm_client.py` выбирает провайдера по тому, какой ключ задан, и всегда
+имеет детерминированный fallback, чтобы демонстрация никогда не ломалась:
+
+1. **Yandex Cloud** (OpenAI-совместимый Foundation Models API), если задан `YANDEX_API_KEY` — см. `API_example.py` для примера сырого запроса, который здесь воспроизводится.
+2. **Anthropic Claude**, если вместо этого задан `ANTHROPIC_API_KEY`.
+3. Эвристика по ключевым словам (`_fallback_decompose`), если ни один ключ не задан, либо если вызов API упал по любой причине (сеть, квота, невалидный JSON).
+
+Системный промпт для любой LLM включает содержимое `kb.json` (id, ключевые
+слова, текст шаблона) как контекст для поиска, с явной инструкцией не
+придумывать термины, которых там нет — незнакомая аббревиатура или системное
+имя уходит человеку-оператору (`category=other`, `create_ticket` /
+`request_clarification`), а не в выдуманный ответ. Дополнительная проверка
+(`_apply_kb_safety_net`) применяется к каждой заявке независимо от
+провайдера: если заявка помечена `auto_reply`, но реального текста ответа
+нет, она понижается до обычной заявки на ручную обработку вместо
+«авто-ответа» пустотой.
+
+## Важное продуктовое решение
+
+Это инструмент второй линии поддержки: ИИ никогда не отвечает пользователю
+напрямую. `POST /api/tickets/ingest` всегда вызывается с
+`allow_ai_reply: false` из чата, поэтому заявки всегда попадают оператору на
+проверку — `draft_reply` от ИИ показывается оператору только как
+рекомендованный ответ, который нужно проверить, при необходимости
+отредактировать и отправить вручную.

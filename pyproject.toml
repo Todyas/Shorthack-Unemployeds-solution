@@ -1,7 +1,7 @@
 [project]
-name = "smart-support-gateway"
+name = "tickethelp-backend"
 version = "0.1.0"
-description = "Smart Support Gateway backend for the hackathon demo"
+description = "TicketHelp backend — AI-помощник технической поддержки"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #F8F9F6;
+  color: #1B1E18;
+}
+.font-display { font-family: 'Manrope', sans-serif; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #E0E3DD; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+::selection { background: #D5C9F6; color: #1B1E18; }
+
+:focus-visible { outline: 2px solid #2FA25C; outline-offset: 2px; }
+
+/* Единый стиль обводки для всех outline-иконок в проекте — самая дешёвая
+   правка, которая заметно снижает "шаблонность" интерфейса: скруглённые
+   концы линий вместо резких default-иконок. */
+svg[stroke] { stroke-linecap: round; stroke-linejoin: round; }
+
+.chip { transition: background .15s ease, border-color .15s ease, transform .1s ease; }
+.chip:active { transform: scale(0.97); }
+
+.msg-in { animation: rise .25s ease both; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-in { animation: none; }
+}
+
+/* Небольшой набор переиспользуемых поверхностей, чтобы карточки по всему
+   приложению не собирались вручную из border+shadow+radius в каждом файле. */
+.surface {
+  background: #fff;
+  border: 1px solid rgba(27,31,24,0.06);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 2px rgba(27,31,24,0.04), 0 10px 30px -18px rgba(27,31,24,0.14);
+}
+.surface-ai {
+  background: linear-gradient(180deg, #F9F7FE 0%, #FFFFFF 60%);
+  border: 1px solid rgba(129,97,212,0.14);
+  border-radius: 1.25rem;
+}
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #A6ABA0;
+}
+.brand-text {
+  background-image: linear-gradient(135deg, #1F8347 0%, #6A4ABE 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

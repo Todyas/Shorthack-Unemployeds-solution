@@ -80,3 +80,16 @@ def test_reanalyze_missing_ticket_returns_404(tmp_path):
 
     response = client.post("/api/tickets/999/reanalyze")
     assert response.status_code == 404
+
+
+def test_kb_endpoint_returns_articles(tmp_path):
+    db_path = tmp_path / "tickets-kb.db"
+    app = create_app(f"sqlite:///{db_path}")
+    client = TestClient(app)
+
+    response = client.get("/api/kb")
+    assert response.status_code == 200, response.text
+    articles = response.json()
+    assert isinstance(articles, list)
+    assert len(articles) > 0
+    assert {"id", "category", "title", "keywords", "template_body"} <= articles[0].keys()

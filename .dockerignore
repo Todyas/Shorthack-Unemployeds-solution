@@ -6,7 +6,7 @@ app.db
 .env
 .env.*
 !.env.example
-supportpilot-react
+frontend
 tests
 plan.md
 API_example.py

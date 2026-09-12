@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterator
 
 from sqlmodel import Session, SQLModel, create_engine, select
@@ -80,7 +80,7 @@ def patch_ticket(ticket_id: int, patch: dict) -> Ticket | None:
         for field, value in patch.items():
             if value is not None:
                 setattr(ticket, field, value)
-        ticket.updated_at = datetime.utcnow()
+        ticket.updated_at = datetime.now(timezone.utc)
         session.add(ticket)
         session.commit()
         session.refresh(ticket)
@@ -93,8 +93,8 @@ def send_ticket(ticket_id: int) -> Ticket | None:
         if ticket is None:
             return None
         ticket.status = TicketStatus.RESOLVED.value
-        ticket.sent_at = datetime.utcnow()
-        ticket.updated_at = datetime.utcnow()
+        ticket.sent_at = datetime.now(timezone.utc)
+        ticket.updated_at = datetime.now(timezone.utc)
         session.add(ticket)
         session.commit()
         session.refresh(ticket)
@@ -117,7 +117,7 @@ def apply_reanalysis(ticket_id: int, sub: SubTicket) -> Ticket | None:
         ticket.kb_template_id = sub.kb_template_id
         ticket.draft_reply = sub.draft_reply
         ticket.reasoning = sub.reasoning
-        ticket.updated_at = datetime.utcnow()
+        ticket.updated_at = datetime.now(timezone.utc)
         session.add(ticket)
         session.commit()
         session.refresh(ticket)

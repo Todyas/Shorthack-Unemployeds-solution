@@ -1,1 +1,1 @@
-"""Smart Support Gateway backend package."""
+"""TicketHelp backend package."""
