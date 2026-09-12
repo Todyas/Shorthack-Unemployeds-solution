@@ -20,7 +20,7 @@ from app.database import (
     reset_engine,
     send_ticket,
 )
-from app.llm_client import decompose
+from app.llm_client import check_llm_status, decompose
 from app.models import ActionType, IngestRequest, TicketPatch, TicketStatus
 
 
@@ -56,6 +56,13 @@ def create_app(database_url: str | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/llm/status")
+    def llm_status():
+        # В отличие от decompose(), который тихо уходит в эвристику при любом
+        # сбое (это правильно для демо), здесь — реальный минимальный запрос
+        # к провайдеру и точная причина, если ключ не работает.
+        return check_llm_status()
 
     @app.post("/api/tickets/ingest", status_code=status.HTTP_201_CREATED)
     def ingest(payload: IngestRequest):

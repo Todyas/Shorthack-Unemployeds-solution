@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
-import { API_BASE_URL } from '../../api/client.js'
+import { API_BASE_URL, checkLlmStatus } from '../../api/client.js'
+
+const PROVIDER_LABELS = {
+  yandex: 'Yandex Cloud',
+  anthropic: 'Anthropic Claude',
+  fallback: 'Эвристика (ключ не задан)',
+}
 
 const ENDPOINTS = [
   { method: 'GET', path: '/health', description: 'Проверка живости бэкенда' },
+  { method: 'GET', path: '/api/llm/status', description: 'Реальная проверка ключа ИИ-провайдера' },
   { method: 'POST', path: '/api/tickets/ingest', description: 'Декомпозиция обращения на заявки (вызывает ИИ)' },
   { method: 'GET', path: '/api/tickets', description: 'Список заявок (фильтры: status, priority, category)' },
   { method: 'GET', path: '/api/tickets/{id}', description: 'Одна заявка по id' },
@@ -27,6 +34,9 @@ function absoluteUrl(path) {
 export default function ApiPanel() {
   const [status, setStatus] = useState('checking') // 'checking' | 'ok' | 'down'
   const [checkedAt, setCheckedAt] = useState(null)
+  const [llmStatus, setLlmStatus] = useState(null)
+  const [llmChecking, setLlmChecking] = useState(false)
+  const [llmError, setLlmError] = useState(null)
 
   async function checkHealth() {
     setStatus('checking')
@@ -37,6 +47,19 @@ export default function ApiPanel() {
       setStatus('down')
     } finally {
       setCheckedAt(new Date().toLocaleTimeString('ru-RU'))
+    }
+  }
+
+  async function checkLlmKey() {
+    setLlmChecking(true)
+    setLlmError(null)
+    try {
+      const result = await checkLlmStatus()
+      setLlmStatus(result)
+    } catch (e) {
+      setLlmError(e.message)
+    } finally {
+      setLlmChecking(false)
     }
   }
 
@@ -73,6 +96,52 @@ export default function ApiPanel() {
               {absoluteUrl('')} {checkedAt && `· проверено в ${checkedAt}`}
             </p>
           </div>
+        </div>
+
+        <div className="bg-white border border-ink-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-display font-semibold text-sm">Ключ ИИ-провайдера</h3>
+            <button
+              onClick={checkLlmKey}
+              disabled={llmChecking}
+              className="text-sm font-medium px-3 py-1.5 rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-60"
+            >
+              {llmChecking ? 'Проверяем...' : 'Проверить ключ'}
+            </button>
+          </div>
+          <p className="text-xs text-ink-500 mb-3">
+            Настоящий тестовый запрос к провайдеру (не просто "переменная задана") — покажет реальную причину, если ключ не работает.
+          </p>
+
+          {llmError && (
+            <p className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+              Не удалось выполнить проверку: {llmError}
+            </p>
+          )}
+
+          {llmStatus && (
+            <div className="flex items-start gap-3">
+              <span
+                className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${
+                  !llmStatus.configured ? 'bg-amber-400' : llmStatus.reachable ? 'bg-sber-500' : 'bg-rose-500'
+                }`}
+              />
+              <div className="text-sm">
+                <p className="font-medium">
+                  Провайдер: {PROVIDER_LABELS[llmStatus.provider] || llmStatus.provider}
+                  {llmStatus.configured && (llmStatus.reachable ? ' — ключ работает' : ' — ключ не работает')}
+                </p>
+                {!llmStatus.configured && (
+                  <p className="text-xs text-ink-500 mt-0.5">
+                    YANDEX_API_KEY / ANTHROPIC_API_KEY не заданы — используется эвристика по ключевым словам.
+                  </p>
+                )}
+                {llmStatus.configured && !llmStatus.reachable && (
+                  <p className="text-xs text-rose-600 mt-0.5 break-all">{llmStatus.error}</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white border border-ink-200 rounded-2xl p-5">

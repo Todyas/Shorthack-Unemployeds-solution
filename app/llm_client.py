@@ -263,6 +263,42 @@ def _apply_kb_safety_net(result: DecompositionResult) -> DecompositionResult:
     return result
 
 
+def check_llm_status() -> dict:
+    # Диагностика "жив ли ключ": decompose() нарочно проглатывает любую ошибку
+    # провайдера и тихо уходит в эвристику — это правильно для демо, но
+    # оставляет разработчика гадать, реально ли ключ работает. Здесь наоборот:
+    # делаем минимальный настоящий запрос и возвращаем точную причину сбоя.
+    if os.getenv("YANDEX_API_KEY"):
+        provider = "yandex"
+        try:
+            from openai import OpenAI
+
+            folder = os.getenv("YANDEX_CLOUD_FOLDER", "b1gcckd2llp6t0dj6j6e")
+            model = os.getenv("YANDEX_CLOUD_MODEL", "deepseek-v4-flash/latest")
+            client = OpenAI(
+                api_key=os.environ["YANDEX_API_KEY"],
+                base_url="https://ai.api.cloud.yandex.net/v1",
+                project=folder,
+            )
+            client.responses.create(model=f"gpt://{folder}/{model}", input="ping", max_output_tokens=16)
+            return {"provider": provider, "configured": True, "reachable": True, "error": None}
+        except Exception as e:
+            return {"provider": provider, "configured": True, "reachable": False, "error": str(e)}
+
+    if os.getenv("ANTHROPIC_API_KEY"):
+        provider = "anthropic"
+        try:
+            from anthropic import Anthropic
+
+            client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+            client.messages.create(model="claude-sonnet-4-20250514", max_tokens=16, messages=[{"role": "user", "content": "ping"}])
+            return {"provider": provider, "configured": True, "reachable": True, "error": None}
+        except Exception as e:
+            return {"provider": provider, "configured": True, "reachable": False, "error": str(e)}
+
+    return {"provider": "fallback", "configured": False, "reachable": True, "error": None}
+
+
 def decompose(raw_text: str) -> DecompositionResult:
     if not raw_text or not raw_text.strip():
         raise ValueError("raw_text is required")

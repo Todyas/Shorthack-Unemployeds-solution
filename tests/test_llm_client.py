@@ -1,4 +1,10 @@
-from app.llm_client import _apply_kb_safety_net, _build_system_prompt, _fallback_decompose, _smart_truncate
+from app.llm_client import (
+    _apply_kb_safety_net,
+    _build_system_prompt,
+    _fallback_decompose,
+    _smart_truncate,
+    check_llm_status,
+)
 from app.models import ActionType, Category, DecompositionResult, Priority, SubTicket
 
 
@@ -95,3 +101,81 @@ def test_smart_truncate_cuts_on_word_boundary():
 
 def test_smart_truncate_leaves_short_text_untouched():
     assert _smart_truncate("короткий текст", limit=100) == "короткий текст"
+
+
+def test_check_llm_status_reports_fallback_when_no_key_set(monkeypatch):
+    monkeypatch.delenv("YANDEX_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    status = check_llm_status()
+
+    assert status == {"provider": "fallback", "configured": False, "reachable": True, "error": None}
+
+
+def test_check_llm_status_reports_unreachable_yandex_key(monkeypatch):
+    # Не бьём по настоящей сети — подменяем openai.OpenAI так, чтобы вызов
+    # выглядел как реальный сбой авторизации/сети, и проверяем, что причина
+    # доходит до вызывающего кода, а не проглатывается молча (как в decompose()).
+    monkeypatch.setenv("YANDEX_API_KEY", "fake-key")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            raise RuntimeError("401 Unauthorized")
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            self.responses = FakeResponses()
+
+    import openai
+
+    monkeypatch.setattr(openai, "OpenAI", FakeClient)
+
+    status = check_llm_status()
+
+    assert status["provider"] == "yandex"
+    assert status["configured"] is True
+    assert status["reachable"] is False
+    assert "401 Unauthorized" in status["error"]
+
+
+def test_check_llm_status_reports_working_yandex_key(monkeypatch):
+    monkeypatch.setenv("YANDEX_API_KEY", "fake-key")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            return object()
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            self.responses = FakeResponses()
+
+    import openai
+
+    monkeypatch.setattr(openai, "OpenAI", FakeClient)
+
+    status = check_llm_status()
+
+    assert status == {"provider": "yandex", "configured": True, "reachable": True, "error": None}
+
+
+def test_check_llm_status_prefers_yandex_over_anthropic(monkeypatch):
+    monkeypatch.setenv("YANDEX_API_KEY", "fake-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key-too")
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            return object()
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            self.responses = FakeResponses()
+
+    import openai
+
+    monkeypatch.setattr(openai, "OpenAI", FakeClient)
+
+    status = check_llm_status()
+
+    assert status["provider"] == "yandex"

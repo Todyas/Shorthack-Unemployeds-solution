@@ -53,3 +53,7 @@ export function sendTicket(id) {
 export function reanalyzeTicket(id) {
   return request(`/api/tickets/${id}/reanalyze`, { method: 'POST' })
 }
+
+export function checkLlmStatus() {
+  return request('/api/llm/status')
+}
