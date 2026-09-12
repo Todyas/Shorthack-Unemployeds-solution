@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #F7F8F7;
+  color: #1B1F1C;
+}
+.font-display { font-family: 'Manrope', sans-serif; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #DEE2DE; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+:focus-visible { outline: 2px solid #19A84A; outline-offset: 2px; }
+
+.chip { transition: background .15s ease, border-color .15s ease, transform .1s ease; }
+.chip:active { transform: scale(0.97); }
+
+.msg-in { animation: rise .25s ease both; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-in { animation: none; }
+}
