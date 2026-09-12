@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      YANDEX_API_KEY: ${YANDEX_API_KEY:-}
+      YANDEX_CLOUD_FOLDER: ${YANDEX_CLOUD_FOLDER:-b1gcckd2llp6t0dj6j6e}
+      YANDEX_CLOUD_MODEL: ${YANDEX_CLOUD_MODEL:-deepseek-v4-flash/latest}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - backend_data:/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./supportpilot-react
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend_data:

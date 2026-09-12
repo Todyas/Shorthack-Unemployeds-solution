@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__/
+*.py[oc]
+app.db
+.env
+.env.*
+!.env.example
+supportpilot-react
+tests
+README.md
+plan.md
+API_example.py

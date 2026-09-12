@@ -6,7 +6,7 @@ from typing import Iterator
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from .models import Ticket, TicketStatus
+from .models import SubTicket, Ticket, TicketStatus
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -81,6 +81,28 @@ def send_ticket(ticket_id: int) -> Ticket | None:
             return None
         ticket.status = TicketStatus.RESOLVED.value
         ticket.sent_at = datetime.utcnow()
+        ticket.updated_at = datetime.utcnow()
+        session.add(ticket)
+        session.commit()
+        session.refresh(ticket)
+        return ticket
+
+
+def apply_reanalysis(ticket_id: int, sub: SubTicket) -> Ticket | None:
+    # В отличие от patch_ticket, здесь поле кладётся как есть (включая None) —
+    # свежий анализ должен полностью заменить старый, а не только дополнить его.
+    with Session(engine) as session:
+        ticket = session.get(Ticket, ticket_id)
+        if ticket is None:
+            return None
+        ticket.summary = sub.summary
+        ticket.category = sub.category.value
+        ticket.priority = sub.priority.value
+        ticket.action_type = sub.action_type.value
+        ticket.requires_clarification = bool(sub.requires_clarification)
+        ticket.missing_info = list(sub.missing_info or [])
+        ticket.kb_template_id = sub.kb_template_id
+        ticket.draft_reply = sub.draft_reply
         ticket.updated_at = datetime.utcnow()
         session.add(ticket)
         session.commit()

@@ -11,3 +11,9 @@ wheels/
 /node_modules
 dist
 .DS_Store
+
+# Secrets — never commit real API keys
+.env
+.env.*
+!.env.example
+!supportpilot-react/.env.example

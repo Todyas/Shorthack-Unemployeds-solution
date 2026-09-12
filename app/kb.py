@@ -25,9 +25,10 @@ def get_kb_by_category(category: str) -> dict | None:
 
 def get_kb_template_for_text(raw_text: str, category: Category | str | None = None) -> str | None:
     lower_text = raw_text.lower()
+    category_value = category.value if isinstance(category, Category) else category
     for entry in load_kb():
         entry_category = entry.get("category")
-        if category and str(category) != str(entry_category):
+        if category_value and category_value != entry_category:
             continue
         keywords = entry.get("keywords", [])
         if any(keyword.lower() in lower_text for keyword in keywords):

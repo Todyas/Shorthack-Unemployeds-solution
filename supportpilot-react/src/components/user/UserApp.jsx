@@ -49,7 +49,9 @@ export default function UserApp() {
     // Узел создания заявки по сценарию — отправляем описание в бэкенд
     if (ticketCreationNodes[key]) {
       const data = ticketCreationNodes[key]
-      const rawText = `${data.title}. ${data.summary}`
+      // summary уже самодостаточное описание проблемы — не добавляем title
+      // отдельным предложением, иначе декомпозитор режет его на два тикета.
+      const rawText = data.summary
       setTimeout(async () => {
         await createTicketsFromText(rawText, data.botReply)
         finishFlow()

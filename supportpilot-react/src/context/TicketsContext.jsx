@@ -1,5 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { fetchTickets, ingestTicket, patchTicket, sendTicket as apiSendTicket } from '../api/client.js'
+import {
+  fetchTickets,
+  ingestTicket,
+  patchTicket,
+  reanalyzeTicket as apiReanalyzeTicket,
+  sendTicket as apiSendTicket,
+} from '../api/client.js'
 import { normalizeTicket } from '../api/normalize.js'
 
 const TicketsContext = createContext(null)
@@ -53,8 +59,17 @@ export function TicketsProvider({ children }) {
     return normalized
   }
 
+  async function reanalyzeTicket(id) {
+    const updated = await apiReanalyzeTicket(id)
+    const normalized = normalizeTicket(updated)
+    setTickets((prev) => prev.map((t) => (t.id === id ? normalized : t)))
+    return normalized
+  }
+
   return (
-    <TicketsContext.Provider value={{ tickets, loading, error, refresh, addTicket, updateTicket, sendTicket }}>
+    <TicketsContext.Provider
+      value={{ tickets, loading, error, refresh, addTicket, updateTicket, sendTicket, reanalyzeTicket }}
+    >
       {children}
     </TicketsContext.Provider>
   )

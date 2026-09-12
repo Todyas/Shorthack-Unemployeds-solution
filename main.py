@@ -3,10 +3,23 @@ from __future__ import annotations
 import uuid
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+
+load_dotenv()  # must run before app modules read os.environ at import time
+
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import bulk_create_tickets, get_ticket_by_id, get_tickets, init_db, patch_ticket, reset_engine, send_ticket
+from app.database import (
+    apply_reanalysis,
+    bulk_create_tickets,
+    get_ticket_by_id,
+    get_tickets,
+    init_db,
+    patch_ticket,
+    reset_engine,
+    send_ticket,
+)
 from app.llm_client import decompose
 from app.models import ActionType, IngestRequest, TicketPatch, TicketStatus
 
@@ -105,6 +118,19 @@ def create_app(database_url: str | None = None) -> FastAPI:
         if ticket is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
         return _serialize_ticket(ticket)
+
+    @app.post("/api/tickets/{ticket_id}/reanalyze")
+    def reanalyze_ticket_endpoint(ticket_id: int):
+        ticket = get_ticket_by_id(ticket_id)
+        if ticket is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
+
+        result = decompose(ticket.original_fragment)
+        if not result.tickets:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Analysis produced no result")
+
+        updated = apply_reanalysis(ticket_id, result.tickets[0])
+        return _serialize_ticket(updated)
 
     @app.get("/api/tickets/{ticket_id}")
     def get_ticket_endpoint(ticket_id: int):

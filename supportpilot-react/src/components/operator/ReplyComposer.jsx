@@ -50,8 +50,12 @@ export default function ReplyComposer({ ticket }) {
     <div className="bg-white border border-ink-200 rounded-2xl p-5">
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-display font-semibold text-sm">Ответ пользователю</h3>
-        <button onClick={() => setReply(ticket.aiDraft || '')} className="text-xs text-ai-600 font-medium hover:text-ai-700">
-          Вставить рекомендованный ответ
+        <button
+          onClick={() => setReply(ticket.aiDraft)}
+          disabled={!ticket.aiDraft}
+          className="text-xs text-ai-600 font-medium hover:text-ai-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ai-600"
+        >
+          {ticket.aiDraft ? 'Вставить рекомендованный ответ' : 'Нет рекомендации от ИИ'}
         </button>
       </div>
       {ticket.aiDraft && (

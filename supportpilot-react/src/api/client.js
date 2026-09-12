@@ -1,5 +1,8 @@
 // Тонкий клиент для FastAPI-бэкенда (Smart Support Gateway).
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+// '??' — не '||': в Docker-сборке VITE_API_BASE_URL нарочно пустая строка
+// (относительные пути, которые проксирует nginx), а '||' заменил бы её на
+// дефолт и сломал прод-сборку.
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -45,4 +48,8 @@ export function patchTicket(id, patch) {
 
 export function sendTicket(id) {
   return request(`/api/tickets/${id}/send`, { method: 'POST' })
+}
+
+export function reanalyzeTicket(id) {
+  return request(`/api/tickets/${id}/reanalyze`, { method: 'POST' })
 }

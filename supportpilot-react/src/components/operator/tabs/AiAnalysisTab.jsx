@@ -1,6 +1,24 @@
+import { useState } from 'react'
+import { useTickets } from '../../../context/TicketsContext.jsx'
 import { priorityStyle, priorityLabel } from '../../../data/constants.js'
 
 export default function AiAnalysisTab({ ticket }) {
+  const { reanalyzeTicket } = useTickets()
+  const [reanalyzing, setReanalyzing] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function handleReanalyze() {
+    setReanalyzing(true)
+    setError(null)
+    try {
+      await reanalyzeTicket(ticket.id)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setReanalyzing(false)
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <div className="bg-white border border-ink-200 rounded-2xl p-5">
@@ -21,13 +39,18 @@ export default function AiAnalysisTab({ ticket }) {
             </span>
             Анализ ИИ
           </h3>
-          <button className="text-xs text-ai-600 font-medium flex items-center gap-1 hover:text-ai-700">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button
+            onClick={handleReanalyze}
+            disabled={reanalyzing}
+            className="text-xs text-ai-600 font-medium flex items-center gap-1 hover:text-ai-700 disabled:opacity-60"
+          >
+            <svg className={`w-3.5 h-3.5 ${reanalyzing ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 4v5h-5" />
             </svg>
-            Перезапустить анализ
+            {reanalyzing ? 'Анализируем...' : 'Перезапустить анализ'}
           </button>
         </div>
+        {error && <p className="text-xs text-rose-600 mb-3">{error}</p>}
 
         <div className="space-y-4 text-sm">
           <div>

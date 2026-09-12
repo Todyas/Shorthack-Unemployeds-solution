@@ -1,17 +1,7 @@
-import { useState } from 'react'
 import { useTickets } from '../../context/TicketsContext.jsx'
 
-const items = [
-  { key: 'inbox', label: 'Входящие', icon: 'M3 8l9 6 9-6M4 6h16v12H4z' },
-  { key: 'mine', label: 'Мои заявки', icon: null },
-  { key: 'all', label: 'Все заявки', icon: null },
-  { key: 'analytics', label: 'Аналитика', icon: null },
-  { key: 'kb', label: 'База знаний', icon: null },
-]
-
-export default function Sidebar({ onNavigate }) {
+export default function Sidebar({ section, onSelectSection }) {
   const { tickets } = useTickets()
-  const [active, setActive] = useState('inbox')
 
   return (
     <aside className="w-60 shrink-0 border-r border-ink-200 bg-white flex flex-col">
@@ -22,8 +12,8 @@ export default function Sidebar({ onNavigate }) {
 
       <nav className="flex-1 py-4 px-3 space-y-1 text-sm">
         <button
-          onClick={() => { setActive('inbox'); onNavigate() }}
-          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium ${active === 'inbox' ? 'bg-sber-50 text-sber-700' : ''}`}
+          onClick={() => onSelectSection('inbox')}
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium ${section === 'inbox' ? 'bg-sber-50 text-sber-700' : ''}`}
         >
           <span className="flex items-center gap-2">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -35,8 +25,8 @@ export default function Sidebar({ onNavigate }) {
         </button>
 
         <button
-          onClick={() => { setActive('mine'); onNavigate() }}
-          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium ${active === 'mine' ? 'bg-sber-50 text-sber-700' : ''}`}
+          onClick={() => onSelectSection('mine')}
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium ${section === 'mine' ? 'bg-sber-50 text-sber-700' : ''}`}
         >
           <span className="flex items-center gap-2">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -54,8 +44,8 @@ export default function Sidebar({ onNavigate }) {
         ].map((it) => (
           <button
             key={it.key}
-            onClick={() => { setActive(it.key); onNavigate() }}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg font-medium ${active === it.key ? 'bg-sber-50 text-sber-700' : ''}`}
+            onClick={() => onSelectSection(it.key)}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg font-medium ${section === it.key ? 'bg-sber-50 text-sber-700' : ''}`}
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d={it.path} />
@@ -63,6 +53,16 @@ export default function Sidebar({ onNavigate }) {
             {it.label}
           </button>
         ))}
+
+        <button
+          onClick={() => onSelectSection('api')}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg font-medium ${section === 'api' ? 'bg-sber-50 text-sber-700' : ''}`}
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
+          </svg>
+          API / Бэкенд
+        </button>
       </nav>
 
       <div className="p-4 border-t border-ink-200 flex items-center gap-2">

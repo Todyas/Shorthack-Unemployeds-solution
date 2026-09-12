@@ -48,3 +48,35 @@ def test_patch_and_send_ticket(tmp_path):
     sent = client.post(f"/api/tickets/{ticket_id}/send")
     assert sent.status_code == 200, sent.text
     assert sent.json()["status"] == "resolved"
+
+
+def test_reanalyze_refreshes_category_and_draft_without_moving_status(tmp_path):
+    db_path = tmp_path / "tickets-reanalyze.db"
+    app = create_app(f"sqlite:///{db_path}")
+    client = TestClient(app)
+
+    ingest = client.post(
+        "/api/tickets/ingest",
+        json={"raw_text": "Не могу подключиться к корпоративному Wi-Fi, пишет ошибку авторизации.", "allow_ai_reply": False},
+    )
+    ticket_id = ingest.json()["created_tickets"][0]["id"]
+
+    # Оператор уже взял заявку в работу — "Перезапустить анализ" не должен сбрасывать статус.
+    client.patch(f"/api/tickets/{ticket_id}", json={"status": "in_progress"})
+
+    reanalyzed = client.post(f"/api/tickets/{ticket_id}/reanalyze")
+    assert reanalyzed.status_code == 200, reanalyzed.text
+    payload = reanalyzed.json()
+    assert payload["status"] == "in_progress"
+    assert payload["category"] == "wifi"
+    assert payload["kb_template_id"] == "kb_wifi_auth_error"
+    assert payload["draft_reply"]
+
+
+def test_reanalyze_missing_ticket_returns_404(tmp_path):
+    db_path = tmp_path / "tickets-reanalyze-404.db"
+    app = create_app(f"sqlite:///{db_path}")
+    client = TestClient(app)
+
+    response = client.post("/api/tickets/999/reanalyze")
+    assert response.status_code == 404
