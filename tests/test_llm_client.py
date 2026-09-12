@@ -1,8 +1,11 @@
+import json
+
 from app.llm_client import (
     _apply_kb_safety_net,
     _build_system_prompt,
     _fallback_decompose,
     _smart_truncate,
+    _yandex_decompose,
     check_llm_status,
 )
 from app.models import ActionType, Category, DecompositionResult, Priority, SubTicket
@@ -103,6 +106,65 @@ def test_smart_truncate_leaves_short_text_untouched():
     assert _smart_truncate("короткий текст", limit=100) == "короткий текст"
 
 
+def test_yandex_decompose_uses_chat_completions_not_responses_api(monkeypatch):
+    # Регрессия: изначально использовался client.responses.create(), которое
+    # у Yandex Cloud требует отдельную повышенную роль (ai.assistants.editor)
+    # и падало 403 даже с рабочим ключом. chat.completions.create() — базовый
+    # OpenAI-совместимый путь с более распространённой ролью.
+    monkeypatch.setenv("YANDEX_API_KEY", "fake-key")
+    payload = json.dumps(
+        {
+            "source_text": "тест",
+            "tickets": [
+                {
+                    "original_fragment": "тест",
+                    "summary": "тест",
+                    "category": "other",
+                    "priority": "low",
+                    "action_type": "create_ticket",
+                    "requires_clarification": False,
+                    "missing_info": [],
+                    "kb_template_id": None,
+                    "draft_reply": None,
+                    "reasoning": "тестовое обоснование",
+                }
+            ],
+        }
+    )
+
+    class FakeMessage:
+        content = payload
+
+    class FakeChoice:
+        message = FakeMessage()
+
+    class FakeResponse:
+        choices = [FakeChoice()]
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return FakeResponse()
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeCompletions()
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            self.chat = FakeChat()
+            # .responses не определён вовсе — если код попробует его
+            # использовать, тест упадёт с AttributeError, а не тихо пройдёт.
+
+    import openai
+
+    monkeypatch.setattr(openai, "OpenAI", FakeClient)
+
+    result = _yandex_decompose("тест")
+
+    assert result.tickets[0].category == Category.OTHER
+    assert result.tickets[0].reasoning == "тестовое обоснование"
+
+
 def test_check_llm_status_reports_fallback_when_no_key_set(monkeypatch):
     monkeypatch.delenv("YANDEX_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -119,13 +181,17 @@ def test_check_llm_status_reports_unreachable_yandex_key(monkeypatch):
     monkeypatch.setenv("YANDEX_API_KEY", "fake-key")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
-    class FakeResponses:
+    class FakeCompletions:
         def create(self, **kwargs):
             raise RuntimeError("401 Unauthorized")
 
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeCompletions()
+
     class FakeClient:
         def __init__(self, *args, **kwargs):
-            self.responses = FakeResponses()
+            self.chat = FakeChat()
 
     import openai
 
@@ -143,13 +209,17 @@ def test_check_llm_status_reports_working_yandex_key(monkeypatch):
     monkeypatch.setenv("YANDEX_API_KEY", "fake-key")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
-    class FakeResponses:
+    class FakeCompletions:
         def create(self, **kwargs):
             return object()
 
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeCompletions()
+
     class FakeClient:
         def __init__(self, *args, **kwargs):
-            self.responses = FakeResponses()
+            self.chat = FakeChat()
 
     import openai
 
@@ -164,13 +234,17 @@ def test_check_llm_status_prefers_yandex_over_anthropic(monkeypatch):
     monkeypatch.setenv("YANDEX_API_KEY", "fake-key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key-too")
 
-    class FakeResponses:
+    class FakeCompletions:
         def create(self, **kwargs):
             return object()
 
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeCompletions()
+
     class FakeClient:
         def __init__(self, *args, **kwargs):
-            self.responses = FakeResponses()
+            self.chat = FakeChat()
 
     import openai
 

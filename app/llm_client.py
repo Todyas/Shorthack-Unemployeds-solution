@@ -181,25 +181,36 @@ def _parse_decomposition_json(text: str) -> DecompositionResult:
     return DecompositionResult.model_validate(payload)
 
 
-def _yandex_decompose(raw_text: str) -> DecompositionResult:
+def _yandex_client_and_model() -> tuple:
     from openai import OpenAI
 
     folder = os.getenv("YANDEX_CLOUD_FOLDER", "b1gcckd2llp6t0dj6j6e")
     model = os.getenv("YANDEX_CLOUD_MODEL", "deepseek-v4-flash/latest")
-
     client = OpenAI(
         api_key=os.environ["YANDEX_API_KEY"],
         base_url="https://ai.api.cloud.yandex.net/v1",
         project=folder,
     )
-    response = client.responses.create(
-        model=f"gpt://{folder}/{model}",
+    return client, f"gpt://{folder}/{model}"
+
+
+def _yandex_decompose(raw_text: str) -> DecompositionResult:
+    # Используем chat.completions, а не responses: последний — часть более
+    # новых "AI Assistants" API OpenAI, и Yandex требует под него отдельную
+    # повышенную роль (ai.assistants.editor). Для обычного "текст на входе —
+    # текст на выходе" chat.completions — стандартный путь с более базовой
+    # ролью (ai.languageModels.user), которая обычно уже выдана.
+    client, model_uri = _yandex_client_and_model()
+    response = client.chat.completions.create(
+        model=model_uri,
         temperature=0,
-        instructions=_build_system_prompt(),
-        input=raw_text,
-        max_output_tokens=1500,
+        messages=[
+            {"role": "system", "content": _build_system_prompt()},
+            {"role": "user", "content": raw_text},
+        ],
+        max_tokens=1500,
     )
-    return _parse_decomposition_json(response.output_text)
+    return _parse_decomposition_json(response.choices[0].message.content)
 
 
 def _anthropic_decompose(raw_text: str) -> DecompositionResult:
@@ -271,16 +282,8 @@ def check_llm_status() -> dict:
     if os.getenv("YANDEX_API_KEY"):
         provider = "yandex"
         try:
-            from openai import OpenAI
-
-            folder = os.getenv("YANDEX_CLOUD_FOLDER", "b1gcckd2llp6t0dj6j6e")
-            model = os.getenv("YANDEX_CLOUD_MODEL", "deepseek-v4-flash/latest")
-            client = OpenAI(
-                api_key=os.environ["YANDEX_API_KEY"],
-                base_url="https://ai.api.cloud.yandex.net/v1",
-                project=folder,
-            )
-            client.responses.create(model=f"gpt://{folder}/{model}", input="ping", max_output_tokens=16)
+            client, model_uri = _yandex_client_and_model()
+            client.chat.completions.create(model=model_uri, messages=[{"role": "user", "content": "ping"}], max_tokens=16)
             return {"provider": provider, "configured": True, "reachable": True, "error": None}
         except Exception as e:
             return {"provider": provider, "configured": True, "reachable": False, "error": str(e)}
