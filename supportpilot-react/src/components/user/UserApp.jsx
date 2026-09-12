@@ -8,7 +8,6 @@ import ChatComposer from './ChatComposer.jsx'
 export default function UserApp() {
   const { addTicket } = useTickets()
   const [messages, setMessages] = useState([])
-  const [currentNode, setCurrentNode] = useState('root')
   const idRef = useRef(0)
   const startedRef = useRef(false)
 
@@ -30,19 +29,29 @@ export default function UserApp() {
     setMessages((prev) => prev.filter((m) => m.id !== id))
   }
 
+  // Заявка всегда уходит оператору на проверку: ИИ только определяет
+  // категорию/приоритет и готовит рекомендованный ответ для оператора,
+  // но никогда не отвечает пользователю от своего имени.
+  async function createTicketsFromText(rawText, botReplyText) {
+    try {
+      const created = await addTicket({ rawText })
+      const introText = created.length > 1
+        ? `Обращение разбито на ${created.length} заявки, все переданы оператору.`
+        : botReplyText || 'Спасибо! Ваше обращение зарегистрировано и передано оператору.'
+      pushBubble('bot', introText)
+      created.forEach(pushTicket)
+    } catch (e) {
+      pushBubble('bot', 'Не удалось оформить заявку, попробуйте ещё раз чуть позже.')
+    }
+  }
+
   function goToNode(key) {
-    // Узел создания заявки
+    // Узел создания заявки по сценарию — отправляем описание в бэкенд
     if (ticketCreationNodes[key]) {
       const data = ticketCreationNodes[key]
-      const ticket = addTicket({
-        category: data.category,
-        priority: data.priority,
-        title: data.title,
-        summary: data.summary,
-      })
-      setTimeout(() => {
-        pushBubble('bot', data.botReply)
-        pushTicket(ticket)
+      const rawText = `${data.title}. ${data.summary}`
+      setTimeout(async () => {
+        await createTicketsFromText(rawText, data.botReply)
         finishFlow()
       }, 400)
       return
@@ -50,7 +59,6 @@ export default function UserApp() {
 
     const node = chatTree[key]
     if (!node) return
-    setCurrentNode(key)
     setTimeout(() => {
       pushBubble('bot', node.text)
       if (node.options && node.options.length) pushOptions(node.options)
@@ -59,8 +67,7 @@ export default function UserApp() {
 
   function finishFlow() {
     setTimeout(() => {
-      pushBubble('bot', 'Могу ещё чем-то помочь? Можете написать новый вопрос в любой момент.')
-      setCurrentNode('root_free')
+      pushBubble('bot', 'Могу ещё чем-то помочь? Опишите проблему в любой момент — я оформлю заявку.')
     }, 900)
   }
 
@@ -70,26 +77,14 @@ export default function UserApp() {
     goToNode(opt.next)
   }
 
+  // Свободный текст всегда уходит на декомпозицию бэкендом, независимо от
+  // того, на каком шаге сценария сейчас находится пользователь.
   function handleSend(text) {
     pushBubble('user', text)
-    const isFreeMode = currentNode === 'free' || currentNode === 'root_free'
-    if (isFreeMode) {
-      setTimeout(() => {
-        const ticket = addTicket({
-          category: 'Другое',
-          priority: 'low',
-          title: 'Обращение из чата',
-          summary: text,
-        })
-        pushBubble('bot', 'Спасибо, я оформил заявку по вашему описанию и передал оператору.')
-        pushTicket(ticket)
-        finishFlow()
-      }, 400)
-    } else {
-      setTimeout(() => {
-        pushBubble('bot', 'Записал это в заявку. Пожалуйста, выберите вариант выше или уточните детали.')
-      }, 400)
-    }
+    setTimeout(async () => {
+      await createTicketsFromText(text)
+      finishFlow()
+    }, 400)
   }
 
   useEffect(() => {

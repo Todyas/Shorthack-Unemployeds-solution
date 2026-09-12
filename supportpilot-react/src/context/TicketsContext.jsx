@@ -1,46 +1,60 @@
-import { createContext, useContext, useRef, useState } from 'react'
-import { initialTickets } from '../data/tickets.js'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { fetchTickets, ingestTicket, patchTicket, sendTicket as apiSendTicket } from '../api/client.js'
+import { normalizeTicket } from '../api/normalize.js'
 
 const TicketsContext = createContext(null)
 
 export function TicketsProvider({ children }) {
-  const [tickets, setTickets] = useState(initialTickets)
-  const seqRef = useRef(1843) // следующий id новой заявки
+  const [tickets, setTickets] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Добавляет новую заявку (используется чат-ботом) и возвращает её
-  function addTicket({ category, priority, title, summary }) {
-    const ticket = {
-      id: seqRef.current++,
-      title,
-      status: 'new',
-      createdAt: new Date().toLocaleString('ru-RU').slice(0, 17),
-      userName: 'Пользователь чата',
-      userDept: '—',
-      category,
-      priority,
-      confidence: 80 + Math.floor(Math.random() * 15),
-      system: category.split(' → ')[1] || category,
-      cause: 'Определяется оператором',
-      problems: [title],
-      missing: ['Подтверждение оператора'],
-      summary,
-      original: summary,
-      aiDraft: 'Спасибо за обращение! Мы уже работаем над решением, ориентировочное время ответа — до 2 часов.',
-      history: [
-        { author: 'user', text: summary, time: 'сейчас' },
-        { author: 'ai', text: 'Заявка автоматически создана из чата и передана оператору.', time: 'сейчас' },
-      ],
+  const refresh = useCallback(async () => {
+    try {
+      const data = await fetchTickets()
+      setTickets(data.map(normalizeTicket))
+      setError(null)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
     }
-    setTickets((prev) => [ticket, ...prev])
-    return ticket
+  }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  // Отправляет сырой текст обращения в /api/tickets/ingest, обновляет список
+  // и возвращает только те заявки, которые были созданы этим вызовом
+  // (LLM может декомпозировать одно сообщение на несколько заявок).
+  // allowAiReply всегда false по умолчанию: оператор должен проверить
+  // каждую заявку, ИИ не отвечает пользователю автоматически.
+  async function addTicket({ rawText, allowAiReply = false }) {
+    const result = await ingestTicket(rawText, allowAiReply)
+    const data = await fetchTickets()
+    const normalized = data.map(normalizeTicket)
+    setTickets(normalized)
+    const createdIds = new Set(result.created_tickets.map((t) => t.id))
+    return normalized.filter((t) => createdIds.has(t.id))
   }
 
-  function updateTicket(id, patch) {
-    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+  async function updateTicket(id, patch) {
+    const updated = await patchTicket(id, patch)
+    const normalized = normalizeTicket(updated)
+    setTickets((prev) => prev.map((t) => (t.id === id ? normalized : t)))
+    return normalized
+  }
+
+  async function sendTicket(id) {
+    const updated = await apiSendTicket(id)
+    const normalized = normalizeTicket(updated)
+    setTickets((prev) => prev.map((t) => (t.id === id ? normalized : t)))
+    return normalized
   }
 
   return (
-    <TicketsContext.Provider value={{ tickets, addTicket, updateTicket }}>
+    <TicketsContext.Provider value={{ tickets, loading, error, refresh, addTicket, updateTicket, sendTicket }}>
       {children}
     </TicketsContext.Provider>
   )

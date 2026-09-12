@@ -2,12 +2,14 @@ export const priorityStyle = {
   low: 'bg-ink-100 text-ink-700',
   medium: 'bg-amber-100 text-amber-700',
   high: 'bg-rose-100 text-rose-700',
+  urgent: 'bg-rose-600 text-white',
 }
 
 export const priorityLabel = {
   low: 'Низкий',
   medium: 'Средний',
   high: 'Высокий',
+  urgent: 'Срочно',
 }
 
 export const statusMeta = {
