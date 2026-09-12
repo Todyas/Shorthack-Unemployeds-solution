@@ -1,6 +1,6 @@
 import openai
 
-YANDEX_CLOUD_FOLDER = "b1gcckd2llp6t0dj6j6e"
+YANDEX_CLOUD_FOLDER = "b1g9h2ekpl5a4ee50be3"  # исправлено: старое значение не совпадало с папкой сервисного аккаунта этого ключа
 YANDEX_CLOUD_API_KEY = "***…m63s0K"
 YANDEX_CLOUD_MODEL = "deepseek-v4-flash/latest"
 

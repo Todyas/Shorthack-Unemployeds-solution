@@ -184,7 +184,7 @@ def _parse_decomposition_json(text: str) -> DecompositionResult:
 def _yandex_client_and_model() -> tuple:
     from openai import OpenAI
 
-    folder = os.getenv("YANDEX_CLOUD_FOLDER", "b1gcckd2llp6t0dj6j6e")
+    folder = os.getenv("YANDEX_CLOUD_FOLDER", "b1g9h2ekpl5a4ee50be3")
     model = os.getenv("YANDEX_CLOUD_MODEL", "deepseek-v4-flash/latest")
     client = OpenAI(
         api_key=os.environ["YANDEX_API_KEY"],
