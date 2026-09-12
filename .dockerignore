@@ -8,6 +8,5 @@ app.db
 !.env.example
 supportpilot-react
 tests
-README.md
 plan.md
 API_example.py
